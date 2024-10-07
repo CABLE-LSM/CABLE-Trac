@@ -1,0 +1,283 @@
+Index: offline/cable_mpicommon.F90
+===================================================================
+--- offline/cable_mpicommon.F90	(.../trunk)	(revision 4038)
++++ offline/cable_mpicommon.F90	(.../branches/Users/vxh599/trunk_phenology_updates)	(revision 4038)
+@@ -119,7 +119,7 @@
+   INTEGER, PARAMETER :: nrestart = 15
+   INTEGER, PARAMETER :: nsumcasaflux = 62
+   INTEGER, PARAMETER :: nsumcasapool = 40
+-  INTEGER, PARAMETER :: nclimate = 30
++  INTEGER, PARAMETER :: nclimate = 31
+   INTEGER, PARAMETER :: nphen = 9
+   ! MPI: type to hold landpoint decomposition info
+   TYPE lpdecomp_t
+Index: offline/cable_mpimaster.F90
+===================================================================
+--- offline/cable_mpimaster.F90	(.../trunk)	(revision 4038)
++++ offline/cable_mpimaster.F90	(.../branches/Users/vxh599/trunk_phenology_updates)	(revision 4038)
+@@ -6645,6 +6645,11 @@
+      types(bidx)  = MPI_BYTE
+ 
+      bidx = bidx + 1
++     CALL MPI_Get_address (climate%GMD(off), displs(bidx), ierr)
++     blocks(bidx) = i1len
++     types(bidx)  = MPI_BYTE
++
++     bidx = bidx + 1
+      CALL MPI_Get_address (climate%dtemp(off), displs(bidx), ierr)
+      blocks(bidx) = r1len
+      types(bidx)  = MPI_BYTE
+Index: offline/cable_mpiworker.F90
+===================================================================
+--- offline/cable_mpiworker.F90	(.../trunk)	(revision 4038)
++++ offline/cable_mpiworker.F90	(.../branches/Users/vxh599/trunk_phenology_updates)	(revision 4038)
+@@ -6296,6 +6296,10 @@
+     blocks(bidx) = i1len
+     types(bidx)  = MPI_BYTE
+    
++    bidx = bidx + 1
++    CALL MPI_Get_address (climate%GMD(off), displs(bidx), ierr)
++    blocks(bidx) = i1len
++    types(bidx)  = MPI_BYTE
+ 
+     bidx = bidx + 1
+     CALL MPI_Get_address (climate%dtemp(off), displs(bidx), ierr)
+Index: core/biogeochem/cable_phenology.F90
+===================================================================
+--- core/biogeochem/cable_phenology.F90	(.../trunk)	(revision 4038)
++++ core/biogeochem/cable_phenology.F90	(.../branches/Users/vxh599/trunk_phenology_updates)	(revision 4038)
+@@ -51,13 +51,13 @@
+   REAL:: gdd0
+   REAL(r_2) :: phen_tmp
+   REAL, PARAMETER :: k_chilla = 0, k_chillb = 100, k_chillk = 0.05
+-  REAL, PARAMETER :: APHEN_MAX = 200.0, mmoisture_min=0.30
++  REAL, PARAMETER :: APHEN_MAX = 200.0, mmoisture_min=0.30,  ndays_raingreenup = 21
+   INTEGER, PARAMETER:: COLDEST_DAY_NHEMISPHERE = 355
+   INTEGER, PARAMETER:: COLDEST_DAY_SHEMISPHERE = 172
+   REAL :: phengdd5ramp
+ 
+ DO np= 1,mp
+-
++   phen_tmp = 1.0_r_2
+    ! evergreen pfts
+    if (veg%iveg(np) == 31 .or. veg%iveg(np) == 2 .or. veg%iveg(np) == 5) then
+       phen%doyphase(np,1) = -50
+@@ -98,9 +98,15 @@
+    ! raingreen pfts
+    if (veg%iveg(np).ge.6.and.veg%iveg(np).le.10) then ! (grass or crops) need to include raingreen savanna trees here too
+ 
+-      if (climate%dmoist(np).lt. mmoisture_min) phen_tmp = 0.0
++     ! if (climate%dmoist(np).lt. mmoisture_min) phen_tmp = 0.0
++      if (climate%GMD(np) .GE. 1 .and. climate%GMD(np) .LT. ndays_raingreenup) THEN
++         phen_tmp = min(phen_tmp, 0.99)
++      elseif (climate%GMD(np) .EQ. 0) THEN
++         phen_tmp = 0.0_r_2
++      elseif (climate%GMD(np) .GE. ndays_raingreenup) THEN
++         phen_tmp = 1.0_r_2
++      endif
+ 
+-
+    endif
+ 
+  if ((veg%iveg(np) == 3 .or. veg%iveg(np) == 4) .or. &
+@@ -107,13 +113,24 @@
+       (veg%iveg(np).ge.6.and.veg%iveg(np).le.10)) then
+ 
+ 
+-    if (phen_tmp.gt.0.0 .and.( phen%phase(np).eq.3 .or. phen%phase(np).eq.0 )) then
++!!$    if (phen_tmp.gt.0.0 .and.( phen%phase(np).eq.3 .or. phen%phase(np).eq.0 )) then
++!!$       phen%phase(np) = 1 ! greenup
++!!$       phen%doyphase(np,1) = climate%doy
++!!$    elseif (phen_tmp.ge.1.0_r_2 .and. phen%phase(np).eq.1) then
++!!$       phen%phase(np) = 2 ! steady LAI
++!!$       phen%doyphase(np,2) = climate%doy
++!!$    elseif (phen_tmp.lt.1.0_r_2 .and. phen%phase(np).eq.2) then
++!!$       phen%phase(np) = 3 ! senescence
++!!$       phen%doyphase(np,3) = climate%doy
++!!$    endif
++
++    if (phen_tmp.gt.0.0 .and. phen_tmp.lt.1.0_r_2 ) then
+        phen%phase(np) = 1 ! greenup
+        phen%doyphase(np,1) = climate%doy
+-    elseif (phen_tmp.ge.1.0_r_2 .and. phen%phase(np).eq.1) then
++    elseif (phen_tmp.ge.1.0_r_2 ) then
+        phen%phase(np) = 2 ! steady LAI
+        phen%doyphase(np,2) = climate%doy
+-    elseif (phen_tmp.lt.1.0_r_2 .and. phen%phase(np).eq.2) then
++    elseif (phen_tmp .eq. 0.0_r_2) then
+        phen%phase(np) = 3 ! senescence
+        phen%doyphase(np,3) = climate%doy
+     endif
+Index: core/biogeophys/cable_climate.F90
+===================================================================
+--- core/biogeophys/cable_climate.F90	(.../trunk)	(revision 4038)
++++ core/biogeophys/cable_climate.F90	(.../branches/Users/vxh599/trunk_phenology_updates)	(revision 4038)
+@@ -59,6 +59,7 @@
+   real, PARAMETER:: Gaero = 0.015  ! (m s-1) aerodynmaic conductance (for use in PT evap)
+   real, PARAMETER:: Capp   = 29.09    ! isobaric spec heat air    [J/molA/K]
+   real, PARAMETER:: SBoltz  = 5.67e-8  ! Stefan-Boltzmann constant [W/m2/K4]
++  real, PARAMETER:: moisture_min = 0.35
+   climate%doy = idoy
+ 
+ !!$! * Find irradiances, available energy, equilibrium latent heat flux
+@@ -85,13 +86,15 @@
+ 
+   IF (idoy==1 .and. MOD(ktau,ktauday)==1 ) THEN
+       !  climate%evap_PT =  max(phiEq,1.0)*CoeffPT/air%rlam*dels  ! mm
+-        climate%evap_PT =  phiEq*CoeffPT/air%rlam*dels  ! mm
++        climate%evap_PT =  phiEq*CoeffPT/2.5014e6*dels  ! mm
+       !  climate%evap_PT = canopy%epot  ! mm
+       !  climate%aevap  =   canopy%fe/air%rlam*dels ! mm
+         climate%aevap = met%precip ! mm
+   ELSE
+ 
+-     climate%evap_PT = climate%evap_PT + max(phiEq,1.0)*CoeffPT/air%rlam*dels  ! mm
++    ! climate%evap_PT = climate%evap_PT + max(phiEq,1.0)*CoeffPT/air%rlam*dels  ! mm
++    climate%evap_PT = climate%evap_PT + phiEq*CoeffPT/2.5014e6*dels  ! mm
++
+     ! climate%evap_PT =climate%evap_PT + canopy%epot  ! mm
+     ! climate%aevap =  climate%aevap + canopy%fe/air%rlam*dels ! mm
+      climate%aevap = climate%aevap + met%precip ! mm
+@@ -157,6 +160,13 @@
+         climate%chilldays = climate%chilldays + 1
+      ENDWHERE
+ 
++     ! update GMD (growing moisture day) counter
++    where (climate%dmoist .gt. moisture_min)
++     climate%gmd = climate%gmd + 1
++    elsewhere
++     climate%gmd = 0
++    endwhere
++
+      ! Save yesterday's mean temperature for the last month
+      mtemp_last=climate%mtemp
+ 
+@@ -366,7 +376,7 @@
+    ENDIF
+    
+    IF (climate%mtemp_min20(k).GE.-35 .and. climate%mtemp_min20(k).LE.-2 .and. &
+-     alpha_PT_scaled(k).GE.0.35 .and. climate%agdd5(k).gt.350 )  THEN
++     alpha_PT_scaled(k).GE.0.35 .and. climate%agdd5(k).gt.550 )  THEN
+       IF (pft_biome1(k,1).eq.999 ) THEN
+          pft_biome1(k,1) = 6
+       ELSEIF (pft_biome1(k,2).eq.999 ) THEN
+@@ -377,7 +387,7 @@
+    ENDIF
+    
+    IF ( climate%mtemp_min20(k).LE. 5 .and. &
+-        alpha_PT_scaled(k).GE.0.45 .and. climate%agdd5(k).gt.350 )  THEN
++        alpha_PT_scaled(k).GE.0.35 .and. climate%agdd5(k).gt.550 )  THEN
+       IF (pft_biome1(k,1).eq.999 ) THEN
+          pft_biome1(k,1) = 7
+       ELSEIF (pft_biome1(k,2).eq.999 ) THEN
+@@ -539,6 +549,16 @@
+    climate%iveg(k) = 2
+ endif
+ 
++
++! check for EBL in temperate South America: set to Warm grass/shrub instead.
++if (climate%biome(k)==4 .and. &
++     (patch(k)%latitude>=-46.25 .and. patch(k)%latitude<= -23.25 &
++      .and. patch(k)%longitude>=-65.25 .and. patch(k)%longitude<=-42.75)) then
++      climate%biome(k) = 12
++      climate%iveg(k) = 5
++endif
++
++
+ !"(/grass:1/shrub:2/woody:3"
+ !1,3,Evergreen Needleleaf Forest
+ !2,3,Evergreen Broadleaf Forest,,,,,,,,,,,,,,,,,,
+@@ -607,8 +627,8 @@
+    climate%alpha_PT_20=0
+    climate%iveg = 999
+    climate%biome = 999
++   climate%gmd = 0
+ 
+-
+ else
+    CALL READ_CLIMATE_RESTART_NC (climate)
+ 
+@@ -643,7 +663,7 @@
+   ! 1 dim arrays (npt )
+   CHARACTER(len=20),DIMENSION(20) :: A1
+  ! 1 dim arrays (integer) (npt )
+-  CHARACTER(len=20),DIMENSION(3) :: AI1
++  CHARACTER(len=20),DIMENSION(4) :: AI1
+   ! 2 dim arrays (npt,20)
+   CHARACTER(len=20),DIMENSION(3) :: A2
+   ! 2 dim arrays (npt,31)
+@@ -683,6 +703,7 @@
+   AI1(1) = 'chilldays'
+   AI1(2) = 'iveg'
+   AI1(3) = 'biome'
++  AI1(4) = 'GMD'
+ 
+   A2(1) = 'mtemp_min_20'
+   A2(2) = 'mtemp_max_20'
+@@ -693,6 +714,7 @@
+ 
+   A4(1) = 'dtemp_91'
+ 
++!# define UM_BUILD YES
+ # ifndef UM_BUILD
+ 
+   ! Get File-Name
+@@ -836,6 +858,9 @@
+   STATUS = NF90_PUT_VAR(FILE_ID, VIDI1(3), climate%biome )
+   IF(STATUS /= NF90_NoErr) CALL handle_err(STATUS)
+ 
++  STATUS = NF90_PUT_VAR(FILE_ID, VIDI1(4), climate%GMD )
++  IF(STATUS /= NF90_NoErr) CALL handle_err(STATUS)
++
+   STATUS = NF90_PUT_VAR(FILE_ID, VID2(1), climate%mtemp_min_20 )
+   IF(STATUS /= NF90_NoErr) CALL handle_err(STATUS)
+ 
+@@ -884,7 +909,7 @@
+   ! 1 dim arrays (npt )
+   CHARACTER(len=20),DIMENSION(20) :: A1
+  ! 1 dim arrays (integer) (npt )
+-  CHARACTER(len=20),DIMENSION(3) :: AI1
++  CHARACTER(len=20),DIMENSION(4) :: AI1
+   ! 2 dim arrays (npt,20)
+   CHARACTER(len=20),DIMENSION(3) :: A2
+   ! 2 dim arrays (npt,31)
+@@ -925,6 +950,7 @@
+   AI1(1) = 'chilldays'
+   AI1(2) = 'iveg'
+   AI1(3) = 'biome'
++  AI1(4) = 'GMD'
+ 
+   A2(1) = 'mtemp_min_20'
+   A2(2) = 'mtemp_max_20'
+@@ -1035,6 +1061,7 @@
+      CASE ('chilldays'      ) ; climate%chilldays      = TMPI
+      CASE ('iveg'      ) ; climate%iveg     = TMPI
+      CASE ('biome'      ) ; climate%biome     = TMPI
++     CASE ('GMD'      ) ; climate%GMD     = TMPI
+      END SELECT
+   END DO
+ 
+Index: core/biogeophys/cable_define_types.F90
+===================================================================
+--- core/biogeophys/cable_define_types.F90	(.../trunk)	(revision 4038)
++++ core/biogeophys/cable_define_types.F90	(.../branches/Users/vxh599/trunk_phenology_updates)	(revision 4038)
+@@ -562,7 +562,8 @@
+        INTEGER, DIMENSION(:), POINTER ::                                   &
+        chilldays, &   ! length of chilling period (period with T<5deg)
+        iveg, &        ! potential vegetation type based on climatic constraints
+-       biome
++       biome, &
++       GMD            ! growing moisture days (== number days since min moisture threshold)
+ 
+       REAL, DIMENSION(:), POINTER ::                                           &
+       dtemp,        & ! daily temperature
+@@ -1168,7 +1169,8 @@
+    ALLOCATE ( var % GDD0(mp) )
+    ALLOCATE ( var % chilldays(mp) )
+    ALLOCATE ( var % iveg(mp) )
+-    ALLOCATE ( var % biome(mp) )
++   ALLOCATE ( var % biome(mp) )
++   ALLOCATE ( var % GMD(mp) )
+    ALLOCATE ( var % alpha_PT(mp) )
+    ALLOCATE ( var % alpha_PT20(mp) )
+    ALLOCATE ( var % evap_PT(mp) )

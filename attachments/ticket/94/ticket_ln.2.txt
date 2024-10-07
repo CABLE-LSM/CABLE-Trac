@@ -1,0 +1,129 @@
+Technical changes to CABLE as opposed to trunk 150715
+
+Generally the listed changes have been made to facilitate the
+following:
+
+	- Be independent from Met-file to determine Start and
+          end-date
+	- Be able to run CASA (with any other module like POP,BLAZE..)
+	  in CASA_ONLY run to save runtime.
+	- be able to spin CASA and CABLE independently
+	
+	  - spinup with GSWP data
+	  - Choose a min number of repetitions for casa over convergence criterion
+	    (cable_user%CASA_NREP)
+	- added PLUME IO (cable_plume_mip.F90, extra documentation, if desired)
+	- added Weathergenerator(cable_weathergenerator.F90, documentation in the Code)
+	
+
+cable_common.F90 
+  New entries:
+     RunIden = 'STANDARD'  ! an identifier for the output file
+     MetType = "NA" !
+     CANOPY_STRUC !
+     SOIL_STRUC !
+     POP_out = 'rst' ! POP output type ('epi' or 'rst')
+     POP_rst = ' ' !
+
+     CALL_POP               = .FALSE.
+     POP_fromZero           = .FALSE.
+
+     CASA_SPIN_STARTYEAR = 1950 ! for spincasa.F90 only
+     CASA_SPIN_ENDYEAR   = 1960 ! for spincasa.F90 only
+     YEARSTART           = 1950
+     YEAREND             = 1960
+     CASA_OUT_FREQ       = 365
+     CASA_NREP           = 1
+     CASA_DUMP_WRITE     = T/F  ! Set TRUE to safe for later runs 
+     			   without CABLE
+  Routines
+     HANDLE_ERR:     Helper routine to capture netcdf-errors
+          	     with option to add a message
+     GET_UNIT:       Helper to find an unused unit number for the
+          	     opening of intermediate files 
+     IS_LEAPYEAR:    Logical function to determine whether year is a
+     	     	     leapyear
+     LEAP_DAY:       Function to add to length of year (1 or 0)
+     YMDHMS2DOYSOD:  Convert Year-Month-Day-Hour-Minute-Second to
+        	     DayOfYear-SecondOfDay
+     DOYSOD2YMDHMS:  see YMDHMS2DOYSOD	     
+     LAND2XY:        Converts Land-index to x and y with xdimsize as a
+	 	     proxy for resolution
+
+
+cable_driver.F90
+
+	The case CASA_ONLY ist set for icycle > 10 
+	11 C only 
+	12 CN only 
+	13 CNP
+	where there is no CABLE requested.
+	It also drives the READ_CASA_DUMP (safed casa-input from a
+	previous combined run (1<=icycle<=3).
+	
+	First of al there are three loops now:
+	      SPINLOOP : until any criterion for convergence is met
+	      NREP     : Within each spinloop a min number of
+	      	       	 repetitions (to make use of gswp2 data)
+	      YEAR     : If CABLE_USER%START/ENDYEAR is set cable
+	      	       	 will run from start to end. Even for met-files
+			 that have a different starting/ending date
+			 (as long as the interval is a subset). 
+	These settings can be combined any way. 
+	In the "IF ( CALL1 )" BLOCK many of the initialisations have
+	been put. Also, netCDF GSWP file id's will be cycled.
+	PLUME-MIP IO initialisation is done here. (ANYTHING ON PLUME is
+	left undocumented for now. Will do later).
+
+	Routines to create netCDF casa output and restart have been
+	added: WRITE_CASA_OUTPUT_NC, write_casa_restart_nc
+	as well as output and restart for POP: POP_IO
+	
+	The GLOBFOR_OUT is a special POP-output routine
+
+	Depending on the type of met-file used, the
+	close-statements are at different locations in the code.
+
+	Finally, I changed the prepareFiles and renameFiles routines a
+	little bit.
+	
+
+casa_cable.F90
+	 Here, ncdf_dump and read_casa_dump have been resurrected and
+	 modified, as we do need them to test developments that only
+	 have a direct feedback with casa.
+	 [the two cases should be merged!!!]
+
+
+GENERAL:
+I tried hard to keep all the original functionality in driver so that
+no one needs to adapt to this version. This is also the reason why the
+code is by no means beautiful. I have a couple of things on my list to
+make it a bit easier to read and I am happy to do so in the near
+future, but there is currently no time. 
+Of course, it is impossible to forsee each and every option or
+possible failure. We have been using this code quite a while and 
+have removed bugs that we found, but our way of using it might be 
+different from e.g. Aspendale demands.
+
+New MPI files are not yet finalised.
+ 
+I strongly suggest making use of the "ONLY" tag everytime when using modules!
+  - it's safer
+  - makes code much more readable
+
+areas modified by Lars are within the following brackets:
+!--- LN ------------------------------------------[
+!--- LN ------------------------------------------]
+
+areas modified by Vanessa start with:
+!! VH !!
+
+Variables whose names names to be changed:
+NRRRR
+RRRR
+RYEAR
+
+Variable naming convention violations from my side are mainly CAPITAL
+names. We should change that -> all lower case.
+

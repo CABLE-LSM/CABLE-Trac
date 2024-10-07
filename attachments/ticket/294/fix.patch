@@ -1,0 +1,55 @@
+Index: cable_mpicommon.F90
+===================================================================
+--- cable_mpicommon.F90	(revision 8224)
++++ cable_mpicommon.F90	(working copy)
+@@ -55,7 +55,7 @@
+ 
+   ! MPI: number of casa_dump parameters sent/rec'd to/from the workers every
+   ! timestep
+-  INTEGER, PARAMETER :: ncdumprw = 9
++  INTEGER, PARAMETER :: ncdumprw = 8
+   ! MPI: number of casa_LUC parameters sent/rec'd to/from the workers every
+   ! year
+   INTEGER, PARAMETER :: nLUCrw = 12
+Index: cable_mpimaster.F90
+===================================================================
+--- cable_mpimaster.F90	(revision 8224)
++++ cable_mpimaster.F90	(working copy)
+@@ -7396,6 +7396,7 @@
+ 
+     USE casavariable, ONLY: casa_met, casa_flux
+     USE cable_def_types_mod, ONLY: climate_type
++    USE cable_common_module,ONLY: cable_user
+     USE phenvariable
+     IMPLICIT NONE
+ 
+@@ -7502,9 +7503,9 @@
+             &                             types(bidx), ierr)
+        blocks(bidx) = 1
+ 
+-       bidx = bidx + 1
+-       CALL MPI_Get_address (climate%mtemp_max(off), displs(bidx), ierr)
+-       blocks(bidx) = r1len
++       !bidx = bidx + 1
++       !CALL MPI_Get_address (climate%mtemp_max(off), displs(bidx), ierr)
++       !blocks(bidx) = r1len
+ 
+        !****************************************************************
+        ! Ndep
+Index: cable_mpiworker.F90
+===================================================================
+--- cable_mpiworker.F90	(revision 8224)
++++ cable_mpiworker.F90	(working copy)
+@@ -6857,9 +6857,9 @@
+     CALL MPI_Get_address (phen%doyphase, displs(bidx), ierr)
+     blen(bidx) = mphase * i1len
+ 
+-    bidx = bidx + 1
+-    CALL MPI_Get_address (climate%mtemp_max, displs(bidx), ierr)
+-    blen(bidx) = r1len
++    !bidx = bidx + 1
++    !CALL MPI_Get_address (climate%mtemp_max, displs(bidx), ierr)
++    !blen(bidx) = r1len
+ 
+     !****************************************************************
+     ! Ndep

@@ -1,0 +1,270 @@
+Updated _roughness
+======================================================================= 
+cable_roughness.F90 
+New method of getting constants. arg list adapted to pass required vars
+only.
+method of calculating height above canopy etc revised to use new subrs
+See Ticket #271 (https://trac.nci.org.au/trac/cabyyle/ticket/271#ticket)
+----------------------------------------------------------------------- 
+
+Files modified/split in trunk@ Ticket#71 
+======================================================================= 
+cbl_soilsnow_init_special.F90 
+cbl_soilsnow_main.F90 
+cbl_soilsnow_subrs.F90 
+----------------------------------------------------------------------- 
+
+Ticket #199 update aplied here
+======================================================================= 
+cable_parameters.F90 
+----------------------------------------------------------------------- 
+
+Files modified to be consistent with reconciled cable_common, casa_ncdf 
+======================================================================= 
+cable_climate.F90 
+cable_phenology.F90 
+CASAONLY_LUC.F90 
+casa_cable.F90 
+casa_inout.F90 
+pop_io.F90 
+POPLUC.F90 
+----------------------------------------------------------------------- 
+
+Files modified to be consistent with new method of obtaining constants
+======================================================================= 
+cable_air.F90 
+cable_carbon.F90 
+cable_gw_hydro.F90 
+
+cable_canopy.F90  modifications to exclude GW scheme as in HAC version - 
+using hard-wiring " !!" comments - o doesnt interfere with build. The GW scheme 
+needs revision before beig used anyway
+
+See Ticket #270 (https://trac.nci.org.au/trac/cabyyle/ticket/270#ticket)
+----------------------------------------------------------------------- 
+
+Files in the trunk: Removed in the Restructured CABLE  
+======================================================================= 
+cable_diag.F90:
+cable_fFile.F90:
+cable_fprint.F90:
+cable_PyFprint.F90:
+======================================================================= 
+
+Files modified to be consistent with reconciled
+======================================================================= 
+cable_common.F90 
+casa_ncdf.F90 
+user options and some other switches stripped out of cable_common  
+some of the IO routines relegated to casa_ncdf
+This new file needs to be reviewed. Initially they were ncdf related functions
+but it grew to encompass more that should not be in here
+  See Ticket #270 (https://trac.nci.org.au/trac/cabyyle/ticket/270#ticket)
+----------------------------------------------------------------------- 
+
+
+
+Files in the trunk: Files they are replaced with in Restructured CABLE
+======================================================================= 
+cable_cbm.F90:
+        :cbl_model_driver_offline.F90
+
+cable_cbm is basically the per timestep model_driver. It has been called in both UM/offliine apps. However, 
+#defines and if() conditions everywhere direct which parts of the driver are to be activated at which point. 
+This alone is not ideal as it is getting messy. However, in JAC we are aiming to specifically send ONLY 
+necessary variables to parts of the model, rather than entire TYPEs. Thus the "call" in JAC has arg lists 
+populated by specific variables. The idea is to pass that same variable in the offline version as a specific 
+member of a type. These two should have identical value. Thus we can maintain the two methods across versions.
+However, the arg lists will sytactically be populated by ent KINDS that don't necessarily exist in both 
+versions. It is necessary at this time to therefore have two ent versions of this "driver" which should 
+not involve any science anyway.
+See Ticket #265 (https://trac.nci.org.au/trac/cabyyle/ticket/265#ticket)
+----------------------------------------------------------------------- 
+
+cable_albedo.F90:
+        : cbl_albedo.F90
+        : cbl_snow_albedo.F90
+        : cbl_soilColour_albedo.F90
+
+In JAC, the surface albedo is required before CABLE has more generally been 
+initialized. Closer inspection shows that we can compute the surface albedo given 
+only  a few veg and soil parameters  - So long as we move to accessing 
+whether a cell is sunlit or not given the zenith angle rather than downward SW, 
+which in a circular fashion precluding calculation of the surface albedo has not 
+yet been determined, requiring surface albedo in its determination. 
+Closer inspection also reveals that this pathway to get the surface albedo is 
+very un-neccessarily convoluted and hard to follow with non-descriptive varible 
+names and a haphazzard order of operation.
+
+The first step to achieving the ultimate goal of calcculating  the surface albedo 
+as efficiently as possible will be to unclutter the existing albedo_module by 
+separating this logically by subroutines, and creating a new module per file.
+
+The "surface_albedo" routine in particular is re-written to carify what is actually
+needed and when. This then dictated a re-write of cable_init_radiation following a 
+similar strategy as here and for analagous reasons. (see 267)
+
+The below issues are addressed in Ticket #263 
+
+To calculate the surface albedo CABLE needds to compute the canopy 
+reflectivity for which it needs to know the effective LAI, i.e. the LAI that 
+may actually be seen by SW radiation, IF the canopy is covered in snow.
+This calculation has been extracted from the model so that it can be 
+specifically called in isolation: '''cbl_lai_eff.F90''' 
+- in contrast to the previous scenario where it was embedded in a subroutine 
+which DOES require CABLE to be properly initialised - with forcing that does 
+not even exist at the stage where surface albedo is required.
+
+In order to calculate the effective LAI CABLE needs to know the height of the 
+canopy above snow. This calculation has been extracted from the model so that 
+it can be specifically called in isolation: '''cbl_hgtAbove_snow.F90'''
+
+In order to calculate the effective LAI, clearly CABLE needs to know the height of the 
+canopy and the LAI of the PFT at that cell. This calculation has been extracted from 
+the model so that it can be specifically called in isolation: '''cbl_LAI_canopy_height.F90'''
+  In the JAC version of CABLE, we get the LAI and canopy height from UM I/O
+  spatial maps. In the interface we limit these values.However it is not 
+  even clear any longer if this is actually needed.
+
+See Ticket #266(https://trac.nyyci.org.au/trac/cable/ticket/266#ticket)
+----------------------------------------------------------------------- 
+
+cable_radiation.F90:
+        : cbl_init_radiation.F90
+        : cbl_radiation.F90
+        : cbl_rhoch.F90
+        : cbl_sinbet.F90
+        : cbl_spitter.F90
+
+In JAC, the surface albedo is required before CABLE has more generally been 
+initialized. Closer inspection shows that we can compute the surface albedo given 
+only  a few veg and soil parameters  - So long as we move to accessing 
+whether a cell is sunlit or not given the zenith angle rather than downward SW, 
+which in a circular fashion precluding calculation of the surface albedo has not 
+yet been determined, requiring surface albedo in its determination. 
+Closer inspection also reveals that this pathway to get the surface albedo is 
+very un-neccessarily convoluted and hard to follow with non-descriptive varible 
+names and a haphazzard order of operation.
+See Ticket #267 as well
+
+The first step to achieving the ultimate goal of calcculating  the surface albedo 
+as efficiently as possible will be to unclutter the existing radiation_module as it 
+is required by "albedo" code; by first separating the single cable_radiation.F90
+into subroutines per pe modules, files.
+
+The "init_radiation" routine in particular is re-written to carify what is actually
+needed and when. 
+
+See Ticket #267(https://trac.nyyci.org.au/trac/cable/ticket/267#ticket)
+----------------------------------------------------------------------- 
+
+cable_constants.F90:
+cable_data.F90:
+        : cable_math_constants_mod.F90
+        : cable_other_constants_mod.F90
+        : cable_photo_constants_mod.F90
+        : cable_phys_constants_mod.F90
+
+This has come full circle. We are now going to have a seperate file and module 
+for each constants type. These will then moer easily be promoted to runtime 
+definable quantities.  
+
+There were 3 places where CABLE was getting its constants (for e.g. PI=3.1412.....)
+from. Following ACCESS-1.3, as a proof of concept that each called function could be
+embedded with informmation of what data that it should go to the "library" and 
+collect, we initiated this with process with constants. As a self contained 
+initiative a file called cable_data was born to contain the constants and also the 
+functions to gather up what was to be dispatched when needed. Shortly thereafter we 
+were sidetracked. SLI re-introduced the concept of USEing constants through modules 
+again however these modules were all bundled into a single file cable_constants. 
+
+So now we intend to have all the constants coming from only one source.
+
+See Ticket #268(https://trac.nyyci.org.au/trac/cable/ticket/268#ticket)
+======================================================================= 
+    
+
+cable_params_mod.F90, cable_pft_params.F90, cable_soil_params.F90
+
+One of the primary concerns in integrating CABLE and JULES is that CABLE, 
+at the model level, should not be allowed to talk to the ouside world. We should
+be using JULES I/O for that. This means getting rid of the dependence of CABLE 
+on external text files "def_veg(soil)_params.txt. The veg/soil params should 
+ultimately be input to the model as nml variables. A pre-cursor to this was 
+using the files '''cable_pft(soil)_params.F90'''. These are still valid in the offline 
+app, but no longer in JAC where they are fully nml definable. 
+
+There remains an issue of declaring vars (vegin/solin) into which these values 
+can be deposited. Previously these were declaredd in cable_define_types, however 
+this is in the process of being dismantled. Therefore they are now exclusively
+declared in  '''cable_params_mod.F90'''
+
+See Ticket #269(https://trac.nyyci.org.au/trac/cable/ticket/269#ticket)
+----------------------------------------------------------------------- 
+
+Files added in the Restructured CABLE  
+======================================================================= 
+cbl_masks.F90:
+   Achieved on radiation pathway - however is expected in ALL cases to define 
+   masks at "update" stage defining fundamental masks used by CABLE to choose 
+   how to proceed with calculations at a grid point:
+      Is the grid point:  vegetated?
+                          sunlit?
+                          both? 
+See Ticket #264 (https://trac.nci.org.au/trac/cable/ticket/264#ticket)
+----------------------------------------------------------------------- 
+
+cable_types_mod.F90
+  In params/ directry in CABLE-3.0. This is a subset of cable_define_types.F90. 
+  Mostly the header which defines things like #soil levels.   The types defined 
+  in cable_define_types are defined at the top level in JULES and passed to 
+  CABLE thru the model - BUT these are eventually to be dissolved completely 
+  to faciltate LFRIC and also implement a data structure in CABLE. The params
+  defied in cable_types_mod will be evaluated further, tidied up and claified, 
+  dismissed and promoted to namelist stats where appropriate. 
+See Ticket #261 (https://trac.nci.org.au/trac/cable/ticket/261#ticket)
+----------------------------------------------------------------------- 
+
+Computing the effective LAI as seen by SW radiation (cbl_lai_eff.F90)
+cbl_lai_eff.F90
+
+In JAC, the surface albedo is required before CABLE has more generally been 
+initialized. HOWEVER, CABLE does not require initialization beyond a few 
+veg and soil parameters - So long as we move to accessing whether a cell is 
+sunlit or not given the zenith angle.
+
+To calculate the surface albedo CABLE needds to compute the canopy 
+reflectivity for which it needs to know the effective LAI, i.e. the LAI that 
+may actually be seen by SW radiation, IF the canopy is covered in snow.
+This calculation has been extracted from the model so that it can be 
+specifically called in isolation: '''cbl_lai_eff.F90''' 
+- in contrast to the previous scenario where it was embedded in a subroutine 
+which DOES require CABLE to be properly initialised - with forcing that does 
+not even exist at the stage where surface albedo is required.
+
+In order to calculate the effective LAI CABLE needs to know the height of the 
+canopy above snow. This calculation has been extracted from the model so that 
+it can be specifically called in isolation: '''cbl_hgtAbove_snow.F90'''
+
+In order to calculate the effective LAI, clearly CABLE needs to know the height of the 
+canopy and the LAI of the PFT at that cell. This calculation has been extracted from 
+the model so that it can be specifically called in isolation: '''cbl_LAI_canopy_height.F90'''
+  In the JAC version of CABLE, we get the LAI and canopy height from UM I/O
+  spatial maps. In the interface we limit these values.However it is not 
+  even clear any longer if this is actually needed.
+
+See Ticket #263 (https://trac.nyyci.org.au/trac/cable/ticket/263#ticket)
+----------------------------------------------------------------------------
+
+cable_runtime_opts_mod.F90
+  In util/ directry in CABLE-3.0. This is a subset of cable_common.F90. That 
+  prevously declared some of the runtime options that were later referenced 
+  in cable.nml. In the current implementation of JAC there is a cable.nml 
+  that is readin JULES I/O, however this is to b e revised into several more 
+  specific nml files. As a first step we need to have a distinct file where 
+  these are declared. Furthermore, the versions of cable_common b/n JAC and 
+  CABLE-3.0 cannot easily be reconciled and so it is better to isolate what 
+  we actually need in seperate files.
+See Ticket #262 (https://trac.nci.org.au/trac/cable/ticket/262#ticket)
+----------------------------------------------------------------------- 
+
