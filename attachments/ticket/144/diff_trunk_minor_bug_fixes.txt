@@ -1,0 +1,124 @@
+Index: core/biogeochem/casa_cnp.F90
+===================================================================
+--- core/biogeochem/casa_cnp.F90	(.../trunk)	(revision 4040)
++++ core/biogeochem/casa_cnp.F90	(.../branches/Users/vxh599/trunk_minor_bug_fixes_March2017)	(revision 4040)
+@@ -384,8 +384,8 @@
+            casaflux%fracCalloc(:,leaf)  = 0.0
+         ENDWHERE
+ 
+-!! vh !! don't require this fix for LALLOC = 3 (POP allocation scheme)
+-!! Thiss fix can lead to over-allocation to roots, in turn bumping up N-uptake
++!! vh !! 
++!! This fix can lead to over-allocation to roots, in turn bumping up N-uptake
+ !! , leading to decline in mineral nitrogen availability and spikes in fracCalloc,
+ !! causing spikes in tree mortality and lack of model convergence in productive
+ !! regions where LAI is hitting LAImax.
+@@ -1668,10 +1668,7 @@
+                              * casamet%tsoil(nland,ns)
+     casamet%moistavg(nland)  = casamet%moistavg(nland)+ veg%froot(nland,ns) &
+                            * min(soil%sfc(nland),casamet%moist(nland,ns))
+-    casamet%btran(nland)     = casamet%btran(nland)+ veg%froot(nland,ns)  &
+-            * (min(soil%sfc(nland),casamet%moist(nland,ns))-soil%swilt(nland)) &
+-            /(soil%sfc(nland)-soil%swilt(nland))
+-
++    
+  ! Ticket#121
+ 
+     casamet%btran(nland)     = casamet%btran(nland)+ veg%froot(nland,ns)  &
+@@ -2110,9 +2107,9 @@
+     casamet%glai(np)   = MAX(casabiome%glaimin(veg%iveg(np)), &
+                                casabiome%sla(veg%iveg(np)) * casapool%cplant(np,leaf))
+    ! vh !
+-    IF (LALLOC.ne.3) THEN
++    !IF (LALLOC.ne.3) THEN
+        casamet%glai(np)   = MIN(casabiome%glaimax(veg%iveg(np)), casamet%glai(np))
+-    ENDIF
++    !ENDIF
+     casapool%clitter(np,:) = casapool%clitter(np,:) &
+                            + casapool%dClitterdt(np,:) * deltpool
+     casapool%csoil(np,:)   = casapool%csoil(np,:)   &
+@@ -2272,19 +2269,19 @@
+    casabal%cbalance(:) = Cbalplant(:) + Cbalsoil(:)
+ 
+ 
+- do npt=1,mp
+-    IF(abs(casabal%cbalance(npt))>1e-10) THEN
+-      write(*,*) 'cbalance',  npt, Cbalplant(npt), Cbalsoil(npt)
+-      write(*,*) 'cplant', casapool%cplant(npt,:)
+-      write(*,*) 'gpp, npp',casaflux%Cgpp(npt) , &
+-           casaflux%Cnpp(npt)
+-      write(*,*) 'dcplandt',  casapool%dcplantdt(npt,:), sum(casapool%dcplantdt(npt,:))
+-      write(*,*) 'rmplant, rgplant',  casaflux%crmplant(npt,:) , casaflux%crgplant(npt)
+-      write(*,*), 'dclabile',  casapool%dClabiledt(npt)* deltpool
+-       
+-     !  STOP
+-    ENDIF
+- ENDDO
++!!$ do npt=1,mp
++!!$    IF(abs(casabal%cbalance(npt))>1e-10) THEN
++!!$      write(*,*) 'cbalance',  npt, Cbalplant(npt), Cbalsoil(npt)
++!!$      write(*,*) 'cplant', casapool%cplant(npt,:)
++!!$      write(*,*) 'gpp, npp',casaflux%Cgpp(npt) , &
++!!$           casaflux%Cnpp(npt)
++!!$      write(*,*) 'dcplandt',  casapool%dcplantdt(npt,:), sum(casapool%dcplantdt(npt,:))
++!!$      write(*,*) 'rmplant, rgplant',  casaflux%crmplant(npt,:) , casaflux%crgplant(npt)
++!!$      write(*,*), 'dclabile',  casapool%dClabiledt(npt)* deltpool
++!!$       
++!!$     !  STOP
++!!$    ENDIF
++!!$ ENDDO
+ 
+ 
+ 
+Index: core/biogeochem/casa_cable.F90
+===================================================================
+--- core/biogeochem/casa_cable.F90	(.../trunk)	(revision 4040)
++++ core/biogeochem/casa_cable.F90	(.../branches/Users/vxh599/trunk_minor_bug_fixes_March2017)	(revision 4040)
+@@ -908,11 +908,11 @@
+ 
+         IF (icycle<=2) THEN
+             totpsoil(npt)          = psorder(casamet%isorder(npt)) *xpsoil50(casamet%isorder(npt))
+-           casapool%plitter(npt,:)= casapool%Nlitter(npt,:)/casapool%ratioNPlitter(npt,:)
+-            casapool%psoil(npt,:)  = casapool%Nsoil(npt,:)/casapool%ratioNPsoil(npt,:)
++           !casapool%plitter(npt,:)= casapool%Nlitter(npt,:)/casapool%ratioNPlitter(npt,:)
++           ! casapool%psoil(npt,:)  = casapool%Nsoil(npt,:)/casapool%ratioNPsoil(npt,:)
+             ! why is this commented here but used in UM
+-            ! casapool%plitter(npt,:)= casapool%ratiopclitter(npt,:)  * casapool%clitter(npt,:)
+-            ! casapool%psoil(npt,:)  = casapool%ratioPCsoil(npt,:)    * casapool%Csoil(npt,:)
++             casapool%plitter(npt,:)= casapool%ratiopclitter(npt,:)  * casapool%clitter(npt,:)
++             casapool%psoil(npt,:)  = casapool%ratioPCsoil(npt,:)    * casapool%Csoil(npt,:)
+             casapool%psoillab(npt) = totpsoil(npt) *fracpLab(casamet%isorder(npt))
+             casapool%psoilsorb(npt)= casaflux%psorbmax(npt) * casapool%psoillab(npt) &
+                                     /(casaflux%kmlabp(npt)+casapool%psoillab(npt))
+Index: core/biogeophys/cable_common.F90
+===================================================================
+--- core/biogeophys/cable_common.F90	(.../trunk)	(revision 4040)
++++ core/biogeophys/cable_common.F90	(.../branches/Users/vxh599/trunk_minor_bug_fixes_March2017)	(revision 4040)
+@@ -104,7 +104,7 @@
+           CALL_POP               = .FALSE., & !
+           POP_fromZero           = .FALSE., &
+           CALL_Climate           = .FALSE., &
+-          Climate_fromZero       = .FALSE., &
++          Climate_fromZero       = .TRUE., &
+           CASA_fromZero          = .FALSE., &
+           POPLUC                 = .FALSE.
+     
+Index: core/biogeophys/cable_canopy.F90
+===================================================================
+--- core/biogeophys/cable_canopy.F90	(.../trunk)	(revision 4040)
++++ core/biogeophys/cable_canopy.F90	(.../branches/Users/vxh599/trunk_minor_bug_fixes_March2017)	(revision 4040)
+@@ -254,9 +254,12 @@
+ 
+              where (canopy%zetar(:,iter) .gt. 1.e-6)! stable conditions
+ 
++
+                 csw = min(0.3*((log((veg%hc-rough%disp)/rough%z0m) + phist*psihat - &
+-                     psim(canopy%zetar(:,iter)*(veg%hc-rough%disp)/(rough%zref_tq-rough%disp))+ &
+-                     psim(canopy%zetar(:,iter)*rough%z0m/(rough%zref_tq-rough%disp)))/0.4)**2/2., 3.0)* c%csw
++                     psim(canopy%zetar(:,iter)*(veg%hc-rough%disp)/(rough%zref_tq))+ &
++                     psim(canopy%zetar(:,iter)*rough%z0m/(rough%zref_tq)))/0.4)**2/2., 3.0)* c%csw
++
++               
+              elsewhere
+                 csw = c%csw
+              endwhere

@@ -1,0 +1,372 @@
+Index: offline/cable_input.F90
+===================================================================
+--- offline/cable_input.F90	(.../trunk)	(revision 4036)
++++ offline/cable_input.F90	(.../branches/Users/vxh599/trunk_LUC_updates)	(revision 4036)
+@@ -2399,7 +2399,7 @@
+ 
+     ! Write parameter values to CABLE's parameter variables:
+     CALL write_default_params(met,air,ssnow,veg,bgc,soil,canopy,rough, &
+-            rad,logn,vegparmnew,smoy, TFRZ)
++            rad,logn,vegparmnew,smoy, TFRZ, LUC_EXPT)
+ 
+ 
+ 
+Index: offline/cable_parameters.F90
+===================================================================
+--- offline/cable_parameters.F90	(.../trunk)	(revision 4036)
++++ offline/cable_parameters.F90	(.../branches/Users/vxh599/trunk_LUC_updates)	(revision 4036)
+@@ -925,7 +925,7 @@
+   !=============================================================================
+   SUBROUTINE write_default_params(met,  air,    ssnow, veg, bgc,               &
+                                   soil, canopy, rough, rad, logn,              &
+-                                  vegparmnew, month, TFRZ)
++                                  vegparmnew, month, TFRZ, LUC_EXPT)
+   ! Initialize many canopy_type, soil_snow_type, soil_parameter_type and
+   ! roughness_type variables;
+   ! Calculate 'froot' from 'rootbeta' parameter;
+@@ -947,7 +947,7 @@
+   !   landpt(mp)%type- via cable_IO_vars_module (%nap,cstart,cend,ilon,ilat)
+   !   patch(mp)%type - via cable_IO_vars_module (%frac,longitude,latitude)
+ 
+-    USE cable_common_module, only : vegin, soilin, calcsoilalbedo,             &
++    USE cable_common_module, only : vegin, soilin, calcsoilalbedo,  cable_user          &
+                                     init_veg_from_vegin
+     IMPLICIT NONE
+     INTEGER,               INTENT(IN)    :: logn  ! log file unit number
+@@ -963,6 +963,7 @@
+     TYPE (canopy_type),         INTENT(INOUT)   :: canopy
+     TYPE (roughness_type),      INTENT(INOUT)   :: rough
+     TYPE (radiation_type),      INTENT(INOUT)   :: rad
++    TYPE (LUC_EXPT_TYPE), INTENT(IN) :: LUC_EXPT
+ 
+     INTEGER,dimension(:), ALLOCATABLE :: ALLVEG
+     INTEGER :: e,f,h,i  ! do loop counter
+@@ -1078,7 +1079,7 @@
+       ! set land use (1 = primary; 2 = secondary, 3 = open)
+       if (cable_user%popluc) then
+          veg%iLU(landpt(e)%cstart:landpt(e)%cend)= 1
+-         if (landpt(e)%nap.gt.1) then
++         if (landpt(e)%nap.eq.3 .and.veg%iveg(landpt(e)%cstart)<=5 ) then
+             veg%iLU(landpt(e)%cstart+1) = 2
+             veg%iLU(landpt(e)%cend) = 3
+          endif
+@@ -1355,15 +1356,13 @@
+ 
+       IF(cable_user%SOIL_STRUC=='sli') THEN
+          soil%nhorizons = 1 ! use 1 soil horizon globally
+-        ! veg%clitt = 5.0 ! (tC / ha)
+-         veg%F10 = 0.85
++          veg%F10 = 0.85
+          veg%ZR = 5.0
+       END IF
+ 
+       IF(cable_user%SOIL_STRUC=='sli'.or.cable_user%FWSOIL_SWITCH=='Haverd2013') THEN
+          veg%gamma = 3.e-2
+-         !veg%clitt = 5.0 ! (tC / ha)
+-      ENDIF
++       ENDIF
+ !! vh_js !!
+       IF(cable_user%CALL_POP) THEN
+          veg%disturbance_interval = 100
+Index: offline/cable_LUC_EXPT.F90
+===================================================================
+--- offline/cable_LUC_EXPT.F90	(.../trunk)	(revision 4036)
++++ offline/cable_LUC_EXPT.F90	(.../branches/Users/vxh599/trunk_LUC_updates)	(revision 4036)
+@@ -230,15 +230,24 @@
+        LUC_EXPT%ivegp = 14
+     ENDWHERE
+ 
+-    WHERE (LUC_EXPT%biome .eq. 3 .or. LUC_EXPT%biome .eq. 11)
++    WHERE (LUC_EXPT%biome .eq. 3 .or. LUC_EXPT%biome .eq. 11) ! savanna/ xerophytic woods
+        LUC_EXPT%grass = LUC_EXPT%grass + (LUC_EXPT%primaryf+LUC_EXPT%secdf)*1.0/2.0
+        LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 1.0/2.0
+        LUC_EXPT%secdf =  LUC_EXPT%secdf * 1.0/2.0
+-    ELSEWHERE (LUC_EXPT%biome .eq. 12 .or. LUC_EXPT%biome .eq. 13 &
++    ELSEWHERE (LUC_EXPT%biome .eq. 12 .or. LUC_EXPT%biome .eq. 13 & ! shrub
+          .or. LUC_EXPT%biome .eq. 15 .or. LUC_EXPT%biome .eq. 16  )
+-       LUC_EXPT%grass = LUC_EXPT%grass + (LUC_EXPT%primaryf+LUC_EXPT%secdf)*2.0/3.0
+-       LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 1.0/3.0
+-       LUC_EXPT%secdf =  LUC_EXPT%secdf * 1.0/3.0
++       LUC_EXPT%grass = LUC_EXPT%grass + (LUC_EXPT%primaryf+LUC_EXPT%secdf)*4.0/5.0
++       LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 1.0/5.0
++       LUC_EXPT%secdf =  LUC_EXPT%secdf * 1.0/5.0
++    ELSEWHERE (LUC_EXPT%biome .eq. 7 .or. LUC_EXPT%biome .eq. 8 &  ! boreal
++         .or. LUC_EXPT%biome .eq. 9 .or. LUC_EXPT%biome .eq. 10  )
++       LUC_EXPT%grass = LUC_EXPT%grass + (LUC_EXPT%primaryf+LUC_EXPT%secdf)*1.0/5.0
++       LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 4.0/5.0
++       LUC_EXPT%secdf =  LUC_EXPT%secdf * 4.0/5.0
++    ELSEWHERE (LUC_EXPT%biome .eq. 5 .or. LUC_EXPT%biome .eq. 6 ) ! DBL
++       LUC_EXPT%grass = LUC_EXPT%grass + (LUC_EXPT%primaryf+LUC_EXPT%secdf)*0.3
++       LUC_EXPT%primaryf =  LUC_EXPT%primaryf *0.7
++       LUC_EXPT%secdf =  LUC_EXPT%secdf * 0.7
+     END WHERE
+    
+ 
+@@ -278,17 +287,25 @@
+     END DO
+ 
+     ! set secondary vegetation area to be zero where land use transitions don't occur
+-    WHERE (LUC_EXPT%prim_only .eqv. .TRUE.)
+-       LUC_EXPT%secdf(:) = 0.0
+-       LUC_EXPT%primaryf(:) = 1.0
+-       LUC_EXPT%grass(:) = 0.0
+-       WHERE (LUC_EXPT%biome(:) .eq. 3 .or. LUC_EXPT%biome(:) .eq. 11)
++    ! set grass component of primary vegetation cover
++    WHERE (LUC_EXPT%prim_only .eq. .TRUE.)
++       LUC_EXPT%secdf = 0.0
++       LUC_EXPT%primaryf = 1.0
++       LUC_EXPT%grass = 0.0
++       WHERE (LUC_EXPT%biome .eq. 3 .or. LUC_EXPT%biome .eq. 11) ! savanna/ xerophytic woods
+           LUC_EXPT%grass = LUC_EXPT%primaryf*1.0/2.0
+           LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 1.0/2.0
+        ELSEWHERE (LUC_EXPT%biome .eq. 12 .or. LUC_EXPT%biome .eq. 13 &
+-            .or. LUC_EXPT%biome .eq. 15 .or. LUC_EXPT%biome .eq. 16  )
+-          LUC_EXPT%grass = LUC_EXPT%primaryf*2.0/3.0
+-          LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 1.0/3.0
++            .or. LUC_EXPT%biome .eq. 15 .or. LUC_EXPT%biome .eq. 16  ) ! shrub
++          LUC_EXPT%grass = LUC_EXPT%primaryf*4.0/5.0
++          LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 1.0/5.0
++       ELSEWHERE (LUC_EXPT%biome .eq. 7 .or. LUC_EXPT%biome .eq. 8 &
++            .or. LUC_EXPT%biome .eq. 9 .or. LUC_EXPT%biome .eq. 10) ! boreal
++          LUC_EXPT%grass = LUC_EXPT%primaryf*1.0/5.0
++          LUC_EXPT%primaryf =  LUC_EXPT%primaryf * 4.0/5.0
++       ELSEWHERE (LUC_EXPT%biome .eq. 5 .or. LUC_EXPT%biome .eq. 6 ) ! DBL
++          LUC_EXPT%grass = LUC_EXPT%primaryf*0.3
++          LUC_EXPT%primaryf =  LUC_EXPT%primaryf *0.7
+        END WHERE
+     END WHERE
+ 
+@@ -352,6 +369,9 @@
+ 
+ 
+            endif
++        else
++           LUC_EXPT%prim_only(k)=.TRUE.
++
+         endif
+ 
+ ! don't consider LUC events in desert or tundra
+@@ -362,6 +382,7 @@
+           LUC_EXPT%grass(k) = 0.0
+           inPFrac(m,n,1) = 1.0
+           inPFrac(m,n,2:3) = 0.0
++          inVeg(m,n,2:3) = 0
+         endif
+ 
+ 
+@@ -417,8 +438,11 @@
+ 
+   INQUIRE( FILE=TRIM( fname ), EXIST=EXISTFILE )
+ 
+-  IF ( .NOT.EXISTFILE) write(*,*) fname, ' does not exist!!'
+-
++  IF ( .NOT.EXISTFILE) THEN
++     write(*,*) fname, ' does not exist!!'
++  ELSE
++     write(*,*) 'reading biome from : ', fname
++  ENDIF
+   ! Open NetCDF file:
+   STATUS = NF90_OPEN(fname, NF90_NOWRITE, FILE_ID)
+   IF (STATUS /= NF90_noerr) CALL handle_err(STATUS)
+@@ -426,12 +450,13 @@
+ 
+   ! dimensions:
+   ! Land (number of points)
++
++  
+   STATUS = NF90_INQ_DIMID(FILE_ID, 'land'   , dID)
+   IF (STATUS /= NF90_noerr) CALL handle_err(STATUS)
+   STATUS = NF90_INQUIRE_DIMENSION( FILE_ID, dID, LEN=land_dim )
+   IF (STATUS /= NF90_noerr) CALL handle_err(STATUS)
+   
+-
+   IF ( land_dim .NE. mland) THEN
+      WRITE(*,*) "Dimension misfit, ", fname
+      WRITE(*,*) "land_dim", land_dim
+@@ -544,18 +569,29 @@
+  endif
+ 
+ 
+- ! Adjust transition areas based on native tree fraction for savanna grid-cells
+- WHERE (LUC_EXPT%biome .eq. 3 .or. LUC_EXPT%biome .eq. 11) 
++ ! Adjust transition areas based on primary wooded fraction 
++ WHERE (LUC_EXPT%biome .eq. 3 .or. LUC_EXPT%biome .eq. 11)  ! savanna/ xerophytic woods
+     LUC_EXPT%INPUT(ptos)%VAL =  LUC_EXPT%INPUT(ptos)%VAL * 1.0/2.0
+     LUC_EXPT%INPUT(ptog)%VAL =  LUC_EXPT%INPUT(ptog)%VAL * 1.0/2.0
+     LUC_EXPT%INPUT(gtos)%VAL =  LUC_EXPT%INPUT(gtos)%VAL * 1.0/2.0
+     LUC_EXPT%INPUT(stog)%VAL =  LUC_EXPT%INPUT(stog)%VAL * 1.0/2.0
+  ELSEWHERE (LUC_EXPT%biome .eq. 12 .or. LUC_EXPT%biome .eq. 13 &
+-     .or. LUC_EXPT%biome .eq. 15 .or. LUC_EXPT%biome .eq. 16  )
+-    LUC_EXPT%INPUT(ptos)%VAL =  LUC_EXPT%INPUT(ptos)%VAL * 1.0/3.0
+-    LUC_EXPT%INPUT(ptog)%VAL =  LUC_EXPT%INPUT(ptog)%VAL * 1.0/3.0
+-    LUC_EXPT%INPUT(gtos)%VAL =  LUC_EXPT%INPUT(gtos)%VAL * 1.0/3.0
+-    LUC_EXPT%INPUT(stog)%VAL =  LUC_EXPT%INPUT(stog)%VAL * 1.0/3.0
++     .or. LUC_EXPT%biome .eq. 15 .or. LUC_EXPT%biome .eq. 16  ) ! shrub
++    LUC_EXPT%INPUT(ptos)%VAL =  LUC_EXPT%INPUT(ptos)%VAL * 1.0/5.0
++    LUC_EXPT%INPUT(ptog)%VAL =  LUC_EXPT%INPUT(ptog)%VAL * 1.0/5.0
++    LUC_EXPT%INPUT(gtos)%VAL =  LUC_EXPT%INPUT(gtos)%VAL * 1.0/5.0
++    LUC_EXPT%INPUT(stog)%VAL =  LUC_EXPT%INPUT(stog)%VAL * 1.0/5.0
++ ELSEWHERE (LUC_EXPT%biome .eq. 7 .or. LUC_EXPT%biome .eq. 8 &
++            .or. LUC_EXPT%biome .eq. 9 .or. LUC_EXPT%biome .eq. 10) ! boreal
++    LUC_EXPT%INPUT(ptos)%VAL =  LUC_EXPT%INPUT(ptos)%VAL * 0.8
++    LUC_EXPT%INPUT(ptog)%VAL =  LUC_EXPT%INPUT(ptog)%VAL * 0.8
++    LUC_EXPT%INPUT(gtos)%VAL =  LUC_EXPT%INPUT(gtos)%VAL * 0.8
++    LUC_EXPT%INPUT(stog)%VAL =  LUC_EXPT%INPUT(stog)%VAL * 0.8
++ ELSEWHERE (LUC_EXPT%biome .eq. 5 .or. LUC_EXPT%biome .eq. 6 ) ! DBL
++    LUC_EXPT%INPUT(ptos)%VAL =  LUC_EXPT%INPUT(ptos)%VAL * 0.7
++    LUC_EXPT%INPUT(ptog)%VAL =  LUC_EXPT%INPUT(ptog)%VAL * 0.7
++    LUC_EXPT%INPUT(gtos)%VAL =  LUC_EXPT%INPUT(gtos)%VAL * 0.7
++    LUC_EXPT%INPUT(stog)%VAL =  LUC_EXPT%INPUT(stog)%VAL * 0.7
+  ENDWHERE
+ 
+ END SUBROUTINE READ_LUH2
+Index: core/biogeochem/POPLUC.F90
+===================================================================
+--- core/biogeochem/POPLUC.F90	(.../trunk)	(revision 4036)
++++ core/biogeochem/POPLUC.F90	(.../branches/Users/vxh599/trunk_LUC_updates)	(revision 4036)
+@@ -9,7 +9,7 @@
+ ! in each directory containing CABLE code.
+ !
+ ! ==============================================================================
+-! Purpose: module for land-use change which interacts with POP dmeography 
++! Purpose: module for land-use change which interacts with POP demography 
+ ! via secondary forest age-distribution, and updates casa stocks according to land-use transitions
+ !
+ ! Called from: cable_driver or cable_mpimaster
+@@ -312,6 +312,7 @@
+           else
+              POPLUC%freq_age_secondary(g,1) = POPLUC%freq_age_secondary(g,1) + &
+                   POPLUC%freq_age_secondary(g,i)
++             remaining = remaining - POPLUC%freq_age_secondary(g,i)
+              POPLUC%freq_age_secondary(g,i) = 0.0
+              i = i-1;
+           end if
+@@ -1884,7 +1885,7 @@
+        END SELECT
+     END DO
+ 
+- ! READ 2-dimensional fields (nprod)
++ ! READ 3-dimensional fields (nprod)
+     DO i = 1, SIZE(A3)
+        STATUS = NF90_INQ_VARID( FILE_ID, A3(i), dID )
+        IF (STATUS /= NF90_noerr) CALL handle_err(STATUS)
+@@ -1892,8 +1893,8 @@
+        IF (STATUS /= NF90_noerr) CALL handle_err(STATUS)
+ 
+        SELECT CASE ( TRIM(A3(i)))
+-       CASE ('HarvProd' ) ; POPLUC%HarvProd = TMP2
+-       CASE ('ClearProd' ) ; POPLUC%ClearProd = TMP2
++       CASE ('HarvProd' ) ; POPLUC%HarvProd = TMP3
++       CASE ('ClearProd' ) ; POPLUC%ClearProd = TMP3
+        END SELECT
+     END DO
+ 
+Index: core/biogeochem/POP.F90
+===================================================================
+--- core/biogeochem/POP.F90	(.../trunk)	(revision 4036)
++++ core/biogeochem/POP.F90	(.../branches/Users/vxh599/trunk_LUC_updates)	(revision 4036)
+@@ -58,19 +58,19 @@
+ 
+ 
+   REAL(dp),PARAMETER:: FULTON_ALPHA= 3.5 ! recruitment scalar alpha in Fulton (1991)
+-  REAL(dp),PARAMETER:: DENSINDIV_MAX=0.5  !  Maximum density of individuals within a cohort indiv/m2
++  REAL(dp),PARAMETER:: DENSINDIV_MAX=0.2   !  Maximum density of individuals within a cohort indiv/m2
+   REAL(dp),PARAMETER:: DENSINDIV_MIN=1e-9 !
+   REAL(dp),PARAMETER:: Kbiometric=50.0 ! Constant in height-diameter relationship
+   REAL(dp),PARAMETER:: WD= 300.0 ! Wood density kgC/m3
+-  REAL(dp),PARAMETER:: GROWTH_EFFICIENCY_MIN=0.0075 ! 0.008 ! threshold growth efficiency for enhanced mortality (higher value gives higher biomass turnover)
+-  REAL(dp),PARAMETER:: Pmort=2.0 ! exponent in mortality formula
+-  REAL(dp),PARAMETER:: MORT_MAX=0.2 ! upper asymptote for enhanced mortality
++  REAL(dp),PARAMETER:: GROWTH_EFFICIENCY_MIN=0.008  ! threshold growth efficiency for enhanced mortality (higher value gives higher biomass turnover)
++  REAL(dp),PARAMETER:: Pmort=5.0 ! exponent in mortality formula
++  REAL(dp),PARAMETER:: MORT_MAX=0.3 ! upper asymptote for enhanced mortality
+   REAL(dp),PARAMETER:: THETA_recruit=0.95 ! shape parameter in recruitment equation
+   REAL(dp),PARAMETER:: CMASS_STEM_INIT= 1e-4 ! initial biomass kgC/m2
+   REAL(dp),PARAMETER:: POWERbiomass=0.67 ! exponent for biomass in proportion to which cohorts preempt resources
+   REAL(dp),PARAMETER:: POWERGrowthEfficiency = 0.67
+   REAL(dp),PARAMETER:: CrowdingFactor = 0.029
+-  REAL(dp),PARAMETER:: ALPHA_CPC = 10.0
++  REAL(dp),PARAMETER:: ALPHA_CPC = 3.5
+   REAL(dp),PARAMETER:: k_allom1 = 200.0 ! crown area =  k_allom1 * diam ** k_rp
+   REAL(dp),PARAMETER:: k_rp = 1.67  ! constant in crown area relation to tree diameter
+   REAL(dp),PARAMETER:: ksapwood = 0.05 ! rate constant for conversion of sapwood to heartwood (y-1)
+@@ -857,7 +857,8 @@
+                    ! fraction net resource uptake = fraction NPP
+ 
+                    pop%pop_grid(j)%patch(k)%Layer(1)%cohort(c)%frac_resource_uptake = &
+-                        pop%pop_grid(j)%patch(k)%Layer(1)%cohort(c)%frac_NPP *pop%pop_grid(j)%patch(k)%frac_NPP
++                        pop%pop_grid(j)%patch(k)%Layer(1)%cohort(c)%frac_NPP * &
++                        pop%pop_grid(j)%patch(k)%frac_NPP
+ 
+                 endif
+ 
+@@ -993,17 +994,21 @@
+ 
+              ! mort = 0 ! test
+ 
+-             pop%pop_grid(j)%patch(k)%stress_mortality = pop%pop_grid(j)%patch(k)%stress_mortality + mort*cmass_stem
++             pop%pop_grid(j)%patch(k)%stress_mortality = pop%pop_grid(j)%patch(k)%stress_mortality &
++                  + mort*cmass_stem
++             IF (pop%pop_grid(j)%patch(k)%layer(1)%cohort(c)%diameter*100.GT.1.) THEN
++                if (ALLOM_SWITCH.eq.1) then
++                   ! assumes crown radius (m) = 0.14 * dbh (cm)
++                   crown_area = crown_area + pop%pop_grid(j)%patch(k)%Layer(1)%cohort(c)%density* &
++                        PI*(pop%pop_grid(j)%patch(k)%layer(1)%cohort(c)%diameter*100.*0.14)**2
++                else
++                   crown_area = crown_area + pop%pop_grid(j)%patch(k)%Layer(1)%cohort(c)%density* &
++                        k_allom1 * pop%pop_grid(j)%patch(k)%layer(1)%cohort(c)%diameter ** k_rp
++                endif
++             ELSE
++                crown_area = crown_area + 0.5*pop%pop_grid(j)%patch(k)%layer(1)%cohort(c)%LAI
++             ENDIF
+ 
+-             if (ALLOM_SWITCH.eq.1) then
+-                ! assumes crown radius (m) = 0.14 * dbh (cm)
+-                crown_area = crown_area + pop%pop_grid(j)%patch(k)%Layer(1)%cohort(c)%density* &
+-                     PI*(pop%pop_grid(j)%patch(k)%layer(1)%cohort(c)%diameter*100.*0.14)**2
+-             else
+-                crown_area = crown_area + pop%pop_grid(j)%patch(k)%Layer(1)%cohort(c)%density* &
+-                     k_allom1 * pop%pop_grid(j)%patch(k)%layer(1)%cohort(c)%diameter ** k_rp
+-             endif
+-
+              cpc = 1. - exp(-crown_area)
+              pop%pop_grid(j)%patch(k)%cpc = cpc
+              if (cpc.gt.1e-3 .and.  alpha_cpc * (1. - 1./cpc).gt.-50.0) then
+@@ -1466,7 +1471,7 @@
+                   pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%sapwood
+              pop%pop_grid(g)%patch(p)%sapwood_area = pop%pop_grid(g)%patch(p)%sapwood_area + &
+                   pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%sapwood_area
+-             pop%pop_grid(g)%patch(p)%heartwood = pop%pop_grid(g)%patch(p)%sapwood + &
++             pop%pop_grid(g)%patch(p)%heartwood = pop%pop_grid(g)%patch(p)%heartwood + &
+                   pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%heartwood
+              pop%pop_grid(g)%patch(p)%biomass = pop%pop_grid(g)%patch(p)%biomass + cmass_stem
+              pop%pop_grid(g)%cmass_stem_bin(ct) = pop%pop_grid(g)%cmass_stem_bin(ct) + freq*cmass_stem
+@@ -1560,15 +1565,15 @@
+              ! leaf area index in each cohort
+              pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%LAI = LAI(g) * &
+                   min(pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%sapwood_area  &
+-                  /max(pop%pop_grid(g)%sapwood_area,1e-3), 1.0_dp)
++                  /max(pop%pop_grid(g)%sapwood_area,1e-3), 10.0_dp)
+              pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%Cleaf = Cleaf(g) * &
+                   min(pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%sapwood_area  &
+-                  /max(pop%pop_grid(g)%sapwood_area,1.e-3), 1.0_dp)
++                  /max(pop%pop_grid(g)%sapwood_area,1.e-3), 10.0_dp)
+              pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%Croot = Croot(g) * &
+                   min(pop%pop_grid(g)%patch(p)%layer(1)%cohort(i)%sapwood_area  &
+-                  /max(pop%pop_grid(g)%sapwood_area,1e-3), 1.0_dp)
++                  /max(pop%pop_grid(g)%sapwood_area,1e-3), 10.0_dp)
+           ENDDO ! cohorts
+-          pop%pop_grid(g)%patch(p)%LAI = sum(pop%pop_grid(g)%patch(p)%layer(1)%&
++          pop%pop_grid(g)%patch(p)%LAI = sum(pop%pop_grid(g)%patch(p)%layer(1)% &
+                cohort(1:pop%pop_grid(g)%patch(p)%layer(1)%ncohort)%LAI)
+        ENDDO ! patches
+ 
+@@ -1595,7 +1600,7 @@
+              ENDIF
+ 
+ 
+-             IF (diam*100.GT.5.) THEN
++             IF (diam*100.GT.1.) THEN
+ 
+                 if (ALLOM_SWITCH.eq.1) then
+                    !! assumes crown radius (m) = 0.1492 * dbh (cm) (from G. Cook, pers. comm.)

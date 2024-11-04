@@ -1,0 +1,14 @@
+Index: UM/cable_explicit_driver.F90
+===================================================================
+--- UM/cable_explicit_driver.F90        (revision 3446)
++++ UM/cable_explicit_driver.F90        (working copy)
+@@ -67,8 +67,7 @@
+    !--- subr to call CABLE model
+    USE cable_cbm_module, ONLY : cbm
+ 
+-   USE cable_def_types_mod, ONLY : mp, ms, ssnow, rough, canopy, air, rad,     &
+-                                   met
++   USE cable_def_types_mod, ONLY : mp, ms
+ 
+    !--- include subr called to write data for testing purposes 
+    USE cable_diag_module
